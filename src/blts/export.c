@@ -1,14 +1,15 @@
+#include "minishell.h" // Per le dichiarazioni delle funzioni
 #include "libft.h" // Per ft_putstr_fd, ft_putendl_fd
 #include <stdlib.h>   // Per setenv
 #include <string.h>   // Per strchr
 
 // --- CHECCO: inizio funzione ft_export ---
 // Aggiunge o aggiorna variabili d'ambiente, stampa errore se nome non valido
-int ft_export(char **args, char **envp)
+int ft_export(char **args)
 {
     int i = 1; // Inizia dal primo argomento dopo il comando
     if (!args[1]) // Se non ci sono argomenti, stampa tutte le variabili
-        return ft_env(envp);
+        return ft_env(args);
     while (args[i]) {
         char *eq = strchr(args[i], '='); // Cerca il simbolo =
         if (!eq || eq == args[i]) { // Nome non valido

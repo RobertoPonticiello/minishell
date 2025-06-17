@@ -1,4 +1,7 @@
-include "minishell.h" 
+#include "minishell.h"
+#include <signal.h>
+#include <string.h>
+#include <stddef.h>
 
 /*
   Signal handler per SIGINT. Imposta g_state.signal e ristampa il prompt.
@@ -13,7 +16,7 @@ static void handle_sigint(int signo)
 }
 
 /*
-  setup_signals: configura l’handler per SIGINT e ignora SIGQUIT.
+  setup_signals: configura l'handler per SIGINT e ignora SIGQUIT.
 */
 void setup_signals(void)
 {

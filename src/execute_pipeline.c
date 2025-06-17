@@ -1,43 +1,49 @@
 #include "minishell.h"  // contiene t_shell_state g_state e prototipi
+#include <unistd.h>
+#include <sys/wait.h>
+#include <stdlib.h>
+
+extern char **environ;  // Dichiarazione esterna di environ
 
 /*
   Esegue una lista di comandi collegati da pipe e redirezioni.
   commands è la testa di una lista collegata (linked list) di t_command.
 */
-void execute_pipeline(t_command *commands)
+int execute_pipeline(t_command *commands)
 {
-    int **pipes = NULL;        // Array di pipe, ogni pipe ha 2 fd [read, write]
-    pid_t *pids = NULL;        // Array per tenere traccia dei PID dei processi figli
+    int **pipes;
+    pid_t *pids;
     int num_cmds = init_pipeline(commands, &pipes, &pids);  // Inizializza pipe e pids, ritorna numero comandi
-    
-    if (!num_cmds)             // Se non ci sono comandi, esci
-        return;
+    int i;
 
-    t_command *cmd = commands; // Puntatore al primo comando
-    for (int i = 0; cmd; i++) {  // Per ogni comando nella lista
-        pid_t pid = fork();     // Crea un nuovo processo
-        if (pid < 0) {          // Se fork fallisce
-            perror("fork");     // Stampa errore
+    if (num_cmds <= 0)
+        return (1);
+    i = 0;
+    while (i < num_cmds)
+    {
+        t_command *cmd = &commands[i];
+        pids[i] = fork();  // Crea un nuovo processo
+        if (pids[i] < 0)
+        {
             cleanup_resources(pipes, pids, num_cmds);  // Libera risorse
-            return;             // Esci
+            return (1);
         }
-
-        if (pid == 0) {         // Se siamo nel processo figlio
+        if (pids[i] == 0)
+        {
             setup_child_fds(cmd, pipes, num_cmds, i);  // Configura file descriptor
             execute_child(cmd);  // Esegui il comando
+            exit(1);  // Se execute_child ritorna, c'è stato un errore
         }
-
-        pids[i] = pid;          // Salva il PID del figlio
         close_pipe_ends(pipes, num_cmds, i);  // Chiudi le pipe non più necessarie
-        cmd = cmd->next;        // Passa al prossimo comando
+        i++;
     }
-
     close_last_pipe(pipes, num_cmds);  // Chiudi l'ultima pipe rimasta aperta
     wait_for_children(pids, num_cmds); // Aspetta che tutti i figli terminino
     cleanup_resources(pipes, pids, num_cmds);  // Libera tutta la memoria
+    return (0);
 }
 
-static int count_commands(t_command *commands)
+int count_commands(t_command *commands)
 {
     int count = 0;              // Contatore comandi
     t_command *cmd = commands;  // Puntatore al primo comando
@@ -49,7 +55,7 @@ static int count_commands(t_command *commands)
     return count;               // Ritorna numero totale comandi
 }
 
-static int **create_pipes(int num_cmds)
+int **create_pipes(int num_cmds)
 {
     int **pipes;                // Array di pipe
     int i;                      // Contatore
@@ -74,15 +80,16 @@ static int **create_pipes(int num_cmds)
     return pipes;               // Ritorna array pipe creato
 }
 
-static void close_pipe_ends(int **pipes, int num_cmds, int current_cmd)
+void close_pipe_ends(int **pipes, int num_cmds, int current_cmd)
 {
+    (void)num_cmds;  // Evita warning di parametro non utilizzato
     if (current_cmd > 0) {      // Se non è il primo comando
         close(pipes[current_cmd - 1][0]);  // Chiudi fd lettura pipe precedente
         close(pipes[current_cmd - 1][1]);  // Chiudi fd scrittura pipe precedente
     }
 }
 
-static void setup_child_fds(t_command *cmd, int **pipes, int num_cmds, int i)
+void setup_child_fds(t_command *cmd, int **pipes, int num_cmds, int i)
 {
     if (i > 0)                  // Se non è il primo comando
         dup2(pipes[i - 1][0], STDIN_FILENO);  // Leggi dalla pipe precedente
@@ -100,18 +107,20 @@ static void setup_child_fds(t_command *cmd, int **pipes, int num_cmds, int i)
     }
 }
 
-static void execute_child(t_command *cmd)
+void execute_child(t_command *cmd)
 {
     if (cmd->is_builtin) {      // Se è un comando built-in
         execute_builtin(cmd);   // Eseguilo direttamente
         exit(g_state.last_status);  // Esci con status del built-in
     }
-    execve(cmd->path, cmd->argv, environ);  // Altrimenti esegui comando esterno
-    perror("execve");           // Se execve fallisce, stampa errore
+    if (cmd->path) {  // Se abbiamo un percorso valido
+        execve(cmd->path, cmd->argv, environ);  // Esegui comando esterno
+        perror("execve");           // Se execve fallisce, stampa errore
+    }
     exit(EXIT_FAILURE);         // Esci con errore
 }
 
-static void wait_for_children(pid_t *pids, int num_cmds)
+void wait_for_children(pid_t *pids, int num_cmds)
 {
     for (int k = 0; k < num_cmds; ++k) {  // Per ogni processo figlio
         int status;             // Variabile per status
@@ -123,7 +132,7 @@ static void wait_for_children(pid_t *pids, int num_cmds)
     }
 }
 
-static void cleanup_resources(int **pipes, pid_t *pids, int num_cmds)
+void cleanup_resources(int **pipes, pid_t *pids, int num_cmds)
 {
     if (num_cmds > 1) {         // Se ci sono più di un comando
         for (int j = 0; j < num_cmds - 1; ++j)  // Per ogni pipe
@@ -133,7 +142,7 @@ static void cleanup_resources(int **pipes, pid_t *pids, int num_cmds)
     free(pids);                 // Libera array PID
 }
 
-static int init_pipeline(t_command *commands, int **pipes, pid_t **pids)
+int init_pipeline(t_command *commands, int ***pipes, pid_t **pids)
 {
     int num_cmds = count_commands(commands);  // Conta numero comandi
     if (num_cmds == 0)          // Se non ci sono comandi
@@ -151,7 +160,7 @@ static int init_pipeline(t_command *commands, int **pipes, pid_t **pids)
     return num_cmds;            // Ritorna numero comandi
 }
 
-static void close_last_pipe(int **pipes, int num_cmds)
+void close_last_pipe(int **pipes, int num_cmds)
 {
     if (num_cmds > 1) {         // Se ci sono più di un comando
         close(pipes[num_cmds - 2][0]);  // Chiudi fd lettura ultima pipe

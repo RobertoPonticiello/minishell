@@ -1,8 +1,7 @@
-#include "../minishell.h"  // Include l'header principale con le definizioni necessarie
+#include "minishell.h"  // Include l'header principale con le definizioni necessarie
 
-// Prototipi delle funzioni built-in (implementate da Checco)
-// Ogni funzione prende un array di argomenti e restituisce un intero (status)
-extern int ft_echo(char **args);    // Stampa gli argomenti
+// Dichiarazioni delle funzioni built-in
+extern int ft_echo(char **args);    // Stampa argomenti
 extern int ft_cd(char **args);      // Cambia directory
 extern int ft_pwd(char **args);     // Stampa directory corrente
 extern int ft_export(char **args);  // Esporta variabili d'ambiente
@@ -16,17 +15,16 @@ typedef struct s_builtin {
     int (*func)(char **); // Puntatore alla funzione che implementa il comando
 } t_builtin;
 
-// Tabella statica che contiene tutti i comandi built-in disponibili
-// L'ultimo elemento {NULL, NULL} serve come terminatore
-static const t_builtin builtins[] = {
-    {"echo", ft_echo},     // Comando echo
-    {"cd", ft_cd},         // Comando cd
-    {"pwd", ft_pwd},       // Comando pwd
+// Tabella dei comandi built-in
+static t_builtin builtins[] = {
+    {"echo", ft_echo},   // Comando echo
+    {"cd", ft_cd},       // Comando cd
+    {"pwd", ft_pwd},     // Comando pwd
     {"export", ft_export}, // Comando export
-    {"unset", ft_unset},   // Comando unset
-    {"env", ft_env},       // Comando env
-    {"exit", ft_exit},     // Comando exit
-    {NULL, NULL}           // Terminatore della tabella
+    {"unset", ft_unset}, // Comando unset
+    {"env", ft_env},     // Comando env
+    {"exit", ft_exit},   // Comando exit
+    {NULL, NULL}         // Terminatore
 };
 
 /*

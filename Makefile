@@ -13,6 +13,7 @@ PRINTF   := $(PRTFDIR)/libftprintf.a
 # === Compiler & flags ===
 CC       := gcc
 CFLAGS   := -Wall -Wextra -Werror -g -I$(INCDIR) -I$(LIBFTDIR) -I$(PRTFDIR)
+LDFLAGS  := -L$(LIBFTDIR) -lft -L$(PRTFDIR) -lftprintf -lreadline
 
 # === Ricerca ricorsiva dei file .c ===
 SRCS := $(shell find $(SRCDIR) -type f -name '*.c')
@@ -23,7 +24,7 @@ all: $(NAME)
 
 # === Linking finale ===
 $(NAME): $(LIBFT) $(PRINTF) $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) $(LIBFT) $(PRINTF) -o $@
+	$(CC) $(CFLAGS) $(OBJS) $(LDFLAGS) -o $@
 
 # === Compilazione sorgenti in obj/... ===
 $(OBJDIR)/%.o: $(SRCDIR)/%.c

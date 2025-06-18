@@ -1,0 +1,6 @@
+.DS_Store
+.cursorrules
+.vscode
+*.txt
+*.md
+subject/

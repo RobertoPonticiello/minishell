@@ -74,6 +74,12 @@ t_token *handle_redirection_operator(const char *input, int *i)
         *i += 1;
         return (tok);
     }
+    if (input[*i] == '|')
+    {
+        t_token *tok = create_token("|", TOKEN_PIPE);
+        *i += 1;
+        return (tok);
+    }
     return (NULL);
 }
 
@@ -95,11 +101,9 @@ t_token *handle_redirection_operator(const char *input, int *i)
 */
 int is_operator(const char *input, int i)
 {
-    if (input[i] == '|')
-    {
+    if (input[i] == '|' || input[i] == '<' || input[i] == '>')
         return (1);
-    }
-    return (handle_redirection_operator(input, &i) != NULL);
+    return (0);
 }
 
 /*

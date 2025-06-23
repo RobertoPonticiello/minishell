@@ -29,6 +29,7 @@ int execute_pipeline(t_command *commands)
 
     if (num_cmds <= 0)
         return (1);
+    
     i = 0;
     current = commands;
     while (i < num_cmds && current)
@@ -41,18 +42,27 @@ int execute_pipeline(t_command *commands)
         }
         if (pids[i] == 0)
         {
-            setup_child_fds(current, pipes, num_cmds, i);
+            setup_child_pipes(current, pipes, num_cmds, i);
             execute_child(current);
             exit(1);
         }
-        close_pipe_ends(pipes, num_cmds, i);
         i++;
         current = current->next;
     }
-    close_last_pipe(pipes, num_cmds);
+    
+    // PARENT PROCESS: Close all pipe fds immediately after forking all children
+    if (pipes)
+    {
+        for (i = 0; i < num_cmds - 1; i++)
+        {
+            close(pipes[i][0]);
+            close(pipes[i][1]);
+        }
+    }
+    
     wait_for_children(pids, num_cmds);
     cleanup_resources(pipes, pids, num_cmds);
-    return (0);
+    return (g_state.last_status);
 }
 
 int count_commands(t_command *commands)
@@ -92,49 +102,40 @@ int **create_pipes(int num_cmds)
     return pipes;               // Ritorna array pipe creato
 }
 
-void close_pipe_ends(int **pipes, int num_cmds, int current_cmd)
-{
-    if (num_cmds <= 1)
-        return;
-    
-    // Chiudi tutte le pipe tranne quelle necessarie per il prossimo comando
-    for (int i = 0; i < num_cmds - 1; i++) {
-        if (i != current_cmd && i != current_cmd - 1) {
-            close(pipes[i][0]);
-            close(pipes[i][1]);
-        }
-    }
-    
-    // Chiudi le pipe del comando corrente che non servono più
-    if (current_cmd > 0) {
-        close(pipes[current_cmd - 1][1]);  // Chiudi scrittura pipe precedente
-    }
-    if (current_cmd < num_cmds - 1) {
-        close(pipes[current_cmd][0]);  // Chiudi lettura pipe corrente
-    }
-}
 
-void setup_child_fds(t_command *cmd, int **pipes, int num_cmds, int i)
+
+void setup_child_pipes(t_command *cmd, int **pipes, int num_cmds, int i)
 {
-    // Prima chiudi tutti i file descriptor che non servono
-    for (int j = 0; j < num_cmds - 1; ++j) {
-        if (j == i - 1) {  // Pipe di input per il comando corrente
-            if (i > 0)
-                dup2(pipes[j][0], STDIN_FILENO);
-        }
-        else if (j == i) {  // Pipe di output per il comando corrente
-            if (i < num_cmds - 1)
-                dup2(pipes[j][1], STDOUT_FILENO);
-        }
+    // Se non è il primo comando, collega stdin alla pipe precedente
+    if (i > 0)
+    {
+        dup2(pipes[i - 1][0], STDIN_FILENO);
+    }
+    // Se non è l'ultimo comando, collega stdout alla pipe successiva
+    if (i < num_cmds - 1)
+    {
+        dup2(pipes[i][1], STDOUT_FILENO);
+    }
+
+    // Il figlio deve chiudere TUTTI i descrittori della pipe originali
+    // dopo averli duplicati, perché non ne ha più bisogno.
+    for (int j = 0; j < num_cmds - 1; j++)
+    {
         close(pipes[j][0]);
         close(pipes[j][1]);
     }
-
-    // Gestisci le redirezioni dopo le pipe
+    
+    // Gestisci le redirezioni di file (<, >) che hanno la precedenza sulle pipe
     if (cmd->in_fd >= 0)
+    {
         dup2(cmd->in_fd, STDIN_FILENO);
+        close(cmd->in_fd);
+    }
     if (cmd->out_fd >= 0)
+    {
         dup2(cmd->out_fd, STDOUT_FILENO);
+        close(cmd->out_fd);
+    }
 }
 
 void execute_child(t_command *cmd)
@@ -201,13 +202,7 @@ int init_pipeline(t_command *commands, int ***pipes, pid_t **pids)
     return num_cmds;            // Ritorna numero comandi
 }
 
-void close_last_pipe(int **pipes, int num_cmds)
-{
-    if (num_cmds > 1) {         // Se ci sono più di un comando
-        close(pipes[num_cmds - 2][0]);  // Chiudi fd lettura ultima pipe
-        close(pipes[num_cmds - 2][1]);  // Chiudi fd scrittura ultima pipe
-    }
-}
+
 
 /*
   Pulisce tutte le risorse dopo l'esecuzione dei comandi.

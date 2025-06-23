@@ -98,10 +98,8 @@ int ft_exit(char **args);
 /* --- Funzioni di pipeline --- */
 int init_pipeline(t_command *commands, int ***pipes, pid_t **pids);
 void cleanup_resources(int **pipes, pid_t *pids, int num_cmds);
-void setup_child_fds(t_command *cmd, int **pipes, int num_cmds, int i);
+void setup_child_pipes(t_command *cmd, int **pipes, int num_cmds, int i);
 void execute_child(t_command *cmd);
-void close_pipe_ends(int **pipes, int num_cmds, int current_cmd);
-void close_last_pipe(int **pipes, int num_cmds);
 void wait_for_children(pid_t *pids, int num_cmds);
 int **create_pipes(int num_cmds);
 

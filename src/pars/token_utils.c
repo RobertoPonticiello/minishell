@@ -6,7 +6,7 @@
 /*   By: ffebbrar <ffebbrar@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/11 19:24:01 by ffebbrar          #+#    #+#             */
-/*   Updated: 2025/06/17 17:35:36 by ffebbrar         ###   ########.fr       */
+/*   Updated: 2025/06/30 20:52:57 by ffebbrar         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -128,8 +128,14 @@ char *extract_quoted_word(const char *input, int *i, char quote)
     len = 0;
     (*i)++; // Avanza oltre la virgoletta iniziale
     while (input[*i] && input[*i] != quote) {
-        (*i)++;
-        len++;
+        // Gestisce i caratteri di escape nelle double quotes
+        if (quote == '"' && input[*i] == '\\' && input[*i + 1]) {
+            (*i) += 2; // Salta il backslash e il carattere escapato
+            len += 2;
+        } else {
+            (*i)++;
+            len++;
+        }
     }
     char *out = strndup(input + start, len); // Copia solo il contenuto
     if (input[*i] == quote)
@@ -157,12 +163,33 @@ char *extract_word(const char *input, int *i)
 
     start = *i;
     len = 0;
-    if (input[*i] == '\'' || input[*i] == '"')
-        return (extract_quoted_word(input, i, input[*i]));
+    
+    // Continua finché non trova uno spazio o un operatore
     while (input[*i] && input[*i] != ' ' && input[*i] != '\t' &&
-           input[*i] != '|' && input[*i] != '<' && input[*i] != '>' &&
-           input[*i] != '\'' && input[*i] != '"')
-        *i += 1;
+           input[*i] != '|' && input[*i] != '<' && input[*i] != '>')
+    {
+        // Se trova una virgoletta, gestisce tutto fino alla virgoletta di chiusura
+        if (input[*i] == '\'' || input[*i] == '"')
+        {
+            char quote = input[*i];
+            (*i)++; // Salta la virgoletta iniziale
+            while (input[*i] && input[*i] != quote)
+            {
+                // Gestisce i caratteri di escape nelle double quotes
+                if (quote == '"' && input[*i] == '\\' && input[*i + 1])
+                    (*i) += 2; // Salta il backslash e il carattere escapato
+                else
+                    (*i)++;
+            }
+            if (input[*i] == quote)
+                (*i)++; // Salta la virgoletta finale
+        }
+        else
+        {
+            (*i)++;
+        }
+    }
+    
     len = *i - start;
     char *out = strndup(input + start, len);
     return (out);

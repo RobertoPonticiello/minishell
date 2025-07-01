@@ -12,12 +12,14 @@
 
 #include "minishell.h"
 #include <fcntl.h>  // Per i flag O_RDONLY, O_WRONLY, O_CREAT, O_APPEND, O_TRUNC
+#include <errno.h>  // Per errno
 
 /*
 ** Gestisce le redirezioni di input (< e <<).
 ** 
 ** @param cmd: Il comando a cui applicare la redirezione
 ** @param curr: Il token di redirezione corrente
+** @return: 0 se successo, -1 se errore
 **
 ** La funzione gestisce le redirezioni di input:
 ** - Chiude il file descriptor di input esistente se presente
@@ -25,7 +27,7 @@
 ** - Gestisce gli errori di apertura e chiusura
 ** - Aggiorna il file descriptor di input del comando
 */
-static void handle_input_redirection(t_command *cmd, t_token *curr)
+static int handle_input_redirection(t_command *cmd, t_token *curr)
 {
     int fd;
 
@@ -37,11 +39,17 @@ static void handle_input_redirection(t_command *cmd, t_token *curr)
     fd = open(curr->next->value, O_RDONLY);
     if (fd == -1)
     {
-        perror("minishell");
+        if (errno == ENOENT)
+            fprintf(stderr, "minishell: %s: File o directory non esistente\n", curr->next->value);
+        else if (errno == EACCES)
+            fprintf(stderr, "minishell: %s: Permesso negato\n", curr->next->value);
+        else
+            perror("minishell");
         g_state.last_status = 1;
-        return;
+        return (-1);
     }
     cmd->in_fd = fd;
+    return (0);
 }
 
 /*
@@ -49,6 +57,7 @@ static void handle_input_redirection(t_command *cmd, t_token *curr)
 ** 
 ** @param cmd: Il comando a cui applicare la redirezione
 ** @param curr: Il token di redirezione corrente
+** @return: 0 se successo, -1 se errore
 **
 ** La funzione gestisce le redirezioni di output:
 ** - Chiude il file descriptor di output esistente se presente
@@ -56,7 +65,7 @@ static void handle_input_redirection(t_command *cmd, t_token *curr)
 ** - Gestisce gli errori di apertura e chiusura
 ** - Aggiorna il file descriptor di output del comando
 */
-static void handle_output_redirection(t_command *cmd, t_token *curr)
+static int handle_output_redirection(t_command *cmd, t_token *curr)
 {
     int flags;
     int fd;
@@ -74,11 +83,17 @@ static void handle_output_redirection(t_command *cmd, t_token *curr)
     fd = open(curr->next->value, flags, 0644);
     if (fd == -1)
     {
-        perror("minishell");
+        if (errno == ENOENT)
+            fprintf(stderr, "minishell: %s: File o directory non esistente\n", curr->next->value);
+        else if (errno == EACCES)
+            fprintf(stderr, "minishell: %s: Permesso negato\n", curr->next->value);
+        else
+            perror("minishell");
         g_state.last_status = 1;
-        return;
+        return (-1);
     }
     cmd->out_fd = fd;
+    return (0);
 }
 
 /*
@@ -86,6 +101,7 @@ static void handle_output_redirection(t_command *cmd, t_token *curr)
 ** 
 ** @param cmd: Il comando a cui applicare le redirezioni
 ** @param curr: Il token di redirezione corrente
+** @return: 0 se successo, -1 se errore
 **
 ** La funzione gestisce tutti i tipi di redirezione:
 ** - < (input)
@@ -94,12 +110,19 @@ static void handle_output_redirection(t_command *cmd, t_token *curr)
 ** - >> (append)
 ** Chiama le funzioni appropriate in base al tipo di redirezione.
 */
-void handle_redirection(t_command *cmd, t_token *curr)
+int handle_redirection(t_command *cmd, t_token *curr)
 {
     if ((curr->type == TOKEN_REDIR_IN || 
          curr->type == TOKEN_HEREDOC) && curr->next)
-        handle_input_redirection(cmd, curr);
+    {
+        if (handle_input_redirection(cmd, curr) == -1)
+            return (-1);
+    }
     if ((curr->type == TOKEN_REDIR_OUT || 
          curr->type == TOKEN_APPEND) && curr->next)
-        handle_output_redirection(cmd, curr);
+    {
+        if (handle_output_redirection(cmd, curr) == -1)
+            return (-1);
+    }
+    return (0);
 }

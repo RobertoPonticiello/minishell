@@ -36,10 +36,24 @@ void execute_builtin(t_command *cmd)
 {
     const char *cmd_name;  // Nome del comando da eseguire
     int i;                 // Contatore per il ciclo
+    int saved_stdin = -1;  // Salva stdin originale
+    int saved_stdout = -1; // Salva stdout originale
 
     // Controllo di sicurezza: verifica che cmd e i suoi argomenti siano validi
     if (!cmd || !cmd->argv || !cmd->argv[0])
         return;
+
+    // Gestisci le redirezioni per i builtin
+    if (cmd->in_fd >= 0) {
+        saved_stdin = dup(STDIN_FILENO);
+        dup2(cmd->in_fd, STDIN_FILENO);
+        close(cmd->in_fd);
+    }
+    if (cmd->out_fd >= 0) {
+        saved_stdout = dup(STDOUT_FILENO);
+        dup2(cmd->out_fd, STDOUT_FILENO);
+        close(cmd->out_fd);
+    }
 
     cmd_name = cmd->argv[0];  // Prendi il nome del comando dal primo argomento
     
@@ -48,11 +62,22 @@ void execute_builtin(t_command *cmd)
         if (strcmp(cmd_name, builtins[i].name) == 0) {  // Se trova il comando
             // Esegui la funzione built-in corrispondente e salva il suo status
             g_state.last_status = builtins[i].func(cmd->argv);
-            return;  // Esci dopo l'esecuzione
+            break;  // Esci dal ciclo dopo l'esecuzione
         }
     }
     
-    // Se arriviamo qui, il comando non è stato trovato
-    // Questo non dovrebbe mai succedere perché is_builtin è 1
-    g_state.last_status = 1;  // Imposta status di errore
+    // Se il comando non è stato trovato
+    if (builtins[i].name == NULL) {
+        g_state.last_status = 1;  // Imposta status di errore
+    }
+
+    // Ripristina i file descriptor originali
+    if (saved_stdin >= 0) {
+        dup2(saved_stdin, STDIN_FILENO);
+        close(saved_stdin);
+    }
+    if (saved_stdout >= 0) {
+        dup2(saved_stdout, STDOUT_FILENO);
+        close(saved_stdout);
+    }
 } 

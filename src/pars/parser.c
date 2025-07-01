@@ -25,9 +25,8 @@ t_command *parse_input(const char *line)
     if (!tokens)
         return (NULL);
 
-    handle_quotes(tokens); /* 2. Gestione virgolette */
-
-    expand_variables(&tokens); /* 3. Espansione variabili */
+    handle_quotes(tokens); /* 2. Gestione virgolette ed espansione variabili */
+    expand_variables(&tokens); /* 3. Rimozione token vuoti dopo espansione */
 
     if (check_syntax_errors(tokens)) /* 4. Controllo sintassi */
     {

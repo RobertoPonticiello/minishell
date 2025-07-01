@@ -23,6 +23,7 @@ typedef struct s_command {
     int     in_fd;      // file descriptor da usare come STDIN (se non c'è, è -1)
     int     out_fd;     // file descriptor da usare come STDOUT (se non c'è, è -1)
     int     is_builtin; // 1 se è built-in, 0 altrimenti
+    int     redir_error; // 1 se c'è stato un errore di redirezione
     struct s_command *next; // puntatore al comando successivo (per pipeline)
 } t_command;
 
@@ -78,7 +79,7 @@ char *expand_string(const char *str);
 int check_syntax_errors(t_token *tokens);
 
 /* --- Funzioni di gestione redirezioni --- */
-void handle_redirection(t_command *cmd, t_token *curr);
+int handle_redirection(t_command *cmd, t_token *curr);
 
 /* --- Funzioni di costruzione comandi --- */
 t_command *build_commands(t_token *tokens);

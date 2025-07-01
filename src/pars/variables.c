@@ -6,7 +6,7 @@
 /*   By: ffebbrar <ffebbrar@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/11 19:33:02 by ffebbrar          #+#    #+#             */
-/*   Updated: 2025/06/17 17:27:09 by ffebbrar         ###   ########.fr       */
+/*   Updated: 2025/06/30 20:48:42 by ffebbrar         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -99,7 +99,10 @@ int copy_env_value(const char *src, int *si, char *dst, int *di)
         var_len++;
     if (var_len > 0)
         return (handle_env_var(src, var_start, var_len, dst, di, si));
-    return (0);
+    
+    // Se non c'è una variabile valida dopo $, tratta $ come carattere normale
+    dst[(*di)++] = src[(*si)++];
+    return (1);
 }
 
 /*
@@ -146,19 +149,13 @@ char *expand_string(const char *src)
 */
 void expand_variables(t_token **tokens)
 {
-    t_token *curr;
-    char *expanded;
-
-    curr = *tokens;
-    while (curr)
+    // L'espansione è già fatta da handle_quotes
+    // Qui rimuoviamo solo i token vuoti all'inizio di ogni comando (fino al primo pipe)
+    while (*tokens && (*tokens)->type == TOKEN_WORD && (*tokens)->value && strlen((*tokens)->value) == 0)
     {
-        if (curr->type == TOKEN_WORD && curr->value)
-        {
-            expanded = expand_string(curr->value);
-            free(curr->value);
-            curr->value = strdup(expanded);
-            free(expanded);
-        }
-        curr = curr->next;
+        t_token *to_remove = *tokens;
+        *tokens = (*tokens)->next;
+        free(to_remove->value);
+        free(to_remove);
     }
 }

@@ -6,7 +6,7 @@
 /*   By: ffebbrar <ffebbrar@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/06/11 19:31:43 by ffebbrar          #+#    #+#             */
-/*   Updated: 2025/06/17 17:29:57 by ffebbrar         ###   ########.fr       */
+/*   Updated: 2025/06/30 20:35:18 by ffebbrar         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -75,6 +75,15 @@ t_token *tokenize(const char *line)
             i++;
         if (!line[i])
             break;
+        
+        // Prima controlla se inizia con virgolette (priorità alle virgolette)
+        if (line[i] == '\'' || line[i] == '"')
+        {
+            handle_word(line, &i, &head, &tail);
+            continue;
+        }
+        
+        // Poi controlla se è un operatore (solo se NON siamo in virgolette)
         if (is_operator(line, i))
         {
             t_token *tok = handle_redirection_operator(line, &i);
@@ -82,6 +91,8 @@ t_token *tokenize(const char *line)
                 add_token_to_list(&head, &tail, tok);
             continue;
         }
+        
+        // Infine gestisce le parole normali
         handle_word(line, &i, &head, &tail);
     }
     return (head);

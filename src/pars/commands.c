@@ -57,19 +57,40 @@ static t_command *init_command(t_token *curr, int *argc, char **argv)
     cmd = calloc(1, sizeof(t_command));
     cmd->in_fd = -1;
     cmd->out_fd = -1;
+    cmd->redir_error = 0;
     *argc = 0;
     while (curr && curr->type != TOKEN_PIPE)
     {
         if (curr->type == TOKEN_WORD)
             argv[(*argc)++] = strdup(curr->value);
         else if (curr->type >= TOKEN_REDIR_IN && curr->type <= TOKEN_APPEND)
-            handle_redirection(cmd, curr);
+        {
+            if (handle_redirection(cmd, curr) == -1)
+            {
+                cmd->redir_error = 1;
+                // Se una redirezione fallisce, fermarsi qui - bash non continua
+                break;
+            }
+            // Salta il token della redirezione e il file che segue
+            curr = curr->next; // Salta il nome del file
+            if (curr) 
+                curr = curr->next; // Va al token successivo
+            continue; // Non fare curr = curr->next alla fine del loop
+        }
         curr = curr->next;
     }
     argv[*argc] = NULL;
     cmd->argv = malloc((*argc + 1) * sizeof(char*));
     for (int i = 0; i <= *argc; i++)
         cmd->argv[i] = argv[i];
+    
+    // Se non ci sono argomenti e non ci sono errori di redirezione, libera e restituisci NULL
+    if (*argc == 0 && !cmd->redir_error) {
+        free(cmd->argv);
+        free(cmd);
+        return NULL;
+    }
+    
     if (cmd->argv[0])  // Se c'è un comando
         cmd->is_builtin = is_builtin_command(cmd->argv[0]);  // Verifica se è built-in
     return (cmd);
@@ -103,14 +124,29 @@ t_command *build_commands(t_token *tokens)
     while (curr)
     {
         cmd = init_command(curr, &argc, argv);
-        if (!head)
-            head = cmd;
-        else
-            tail->next = cmd;
-        tail = cmd;
+        
+        // Solo aggiungi il comando se non è NULL
+        if (cmd) {
+            if (!head)
+                head = cmd;
+            else
+                tail->next = cmd;
+            tail = cmd;
+        }
+        
+        // Trova il prossimo pipe o fine lista
         while (curr && curr->type != TOKEN_PIPE)
-            curr = curr->next;
-        if (curr)
+        {
+            if (curr->type >= TOKEN_REDIR_IN && curr->type <= TOKEN_APPEND)
+            {
+                curr = curr->next; // Salta il token redirezione
+                if (curr)
+                    curr = curr->next; // Salta il nome del file
+            }
+            else
+                curr = curr->next;
+        }
+        if (curr && curr->type == TOKEN_PIPE)
             curr = curr->next;
     }
     return (head);

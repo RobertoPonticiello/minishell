@@ -3,9 +3,9 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 extern char **environ;  // Dichiarazione esterna di environ
-
 /*
   Esegue una lista di comandi collegati da pipe e redirezioni.
   commands è la testa di una lista collegata (linked list) di t_command.
@@ -14,12 +14,34 @@ int execute_pipeline(t_command *commands)
 {
     int **pipes;
     pid_t *pids;
-    int num_cmds = count_commands(commands);
+    int num_cmds;
+    
+    // Se non ci sono comandi (es. $EMPTY da sola), restituisci 0 come bash
+    if (!commands) {
+        g_state.last_status = 0;
+        return 0;
+    }
+    
+    num_cmds = count_commands(commands);
 
     // Se è un singolo comando built-in, eseguilo direttamente
     if (num_cmds == 1 && commands->is_builtin) {
+        if (commands->redir_error) {
+            return 1;
+        }
         execute_builtin(commands);
         return g_state.last_status;
+    }
+    
+    // Se è un singolo comando con errore di redirezione, ritorna errore
+    if (num_cmds == 1 && commands->redir_error) {
+        return 1;
+    }
+    
+    // Se è un singolo comando vuoto, restituisci 0
+    if (num_cmds == 1 && (!commands->argv || !commands->argv[0] || strlen(commands->argv[0]) == 0)) {
+        g_state.last_status = 0;
+        return 0;
     }
 
     // Altrimenti procedi con la pipeline normale
@@ -140,9 +162,46 @@ void setup_child_pipes(t_command *cmd, int **pipes, int num_cmds, int i)
 
 void execute_child(t_command *cmd)
 {
+    struct stat st;
+    
+    // Se ci sono errori di redirezione, esci con errore
+    if (cmd->redir_error) {
+        exit(1);
+    }
+
     if (cmd->is_builtin) {      // Se è un comando built-in
         execute_builtin(cmd);   // Eseguilo direttamente
         exit(g_state.last_status);  // Esci con status del built-in
+    }
+
+    // Se non abbiamo argomenti o il primo argomento è vuoto, tratta come comando nullo
+    if (!cmd->argv || !cmd->argv[0] || strlen(cmd->argv[0]) == 0) {
+        exit(0);  // Comando nullo restituisce 0 come bash
+    }
+
+    // Se il comando contiene '/', è un percorso specifico
+    if (strchr(cmd->argv[0], '/')) {
+        // Controlla se il file esiste
+        if (stat(cmd->argv[0], &st) == 0) {
+            if (S_ISDIR(st.st_mode)) {
+                // È una directory
+                fprintf(stderr, "minishell: %s: È una directory\n", cmd->argv[0]);
+                exit(126);
+            }
+            if (!(st.st_mode & S_IXUSR)) {
+                // File esiste ma non è eseguibile
+                fprintf(stderr, "minishell: %s: Permesso negato\n", cmd->argv[0]);
+                exit(126);
+            }
+            // File esiste ed è eseguibile
+            execve(cmd->argv[0], cmd->argv, environ);
+            perror("execve");
+            exit(126);
+        } else {
+            // File non esiste
+            fprintf(stderr, "minishell: %s: File o directory non esistente\n", cmd->argv[0]);
+            exit(127);
+        }
     }
 
     // Se non abbiamo un percorso, prova a trovarlo in PATH
@@ -153,13 +212,11 @@ void execute_child(t_command *cmd)
     if (cmd->path) {  // Se abbiamo un percorso valido
         execve(cmd->path, cmd->argv, environ);  // Esegui comando esterno
         perror("execve");           // Se execve fallisce, stampa errore
+        exit(126);
     } else {
-        ft_putstr_fd("minishell: command not found: ", 2);
-        if (cmd->argv && cmd->argv[0])
-            ft_putstr_fd(cmd->argv[0], 2);
-        ft_putstr_fd("\n", 2);
+        fprintf(stderr, "minishell: %s: command not found\n", cmd->argv[0]);
+        exit(127);  // Comando non trovato
     }
-    exit(127);  // Esci con errore "command not found"
 }
 
 void wait_for_children(pid_t *pids, int num_cmds)

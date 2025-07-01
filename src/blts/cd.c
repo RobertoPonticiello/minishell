@@ -8,6 +8,13 @@
 int ft_cd(char **args)
 {
     char *path = NULL;
+    
+    // Controlla se ci sono troppi argomenti
+    if (args[1] && args[2]) {
+        fprintf(stderr, "cd: troppi argomenti\n");
+        return 1;
+    }
+    
     if (!args[1] || strcmp(args[1], "~") == 0) // cd o cd ~
         path = getenv("HOME"); // Usa $HOME
     else if (strcmp(args[1], "-") == 0) // cd -

@@ -13,6 +13,8 @@ static void handle_sigint(int signo)
 {
     (void)signo;
     g_state.signal = SIGINT;
+    /* Stampa una newline per andare a capo */
+    write(STDOUT_FILENO, "\n", 1);
     /* Pulisci il buffer di input */
     rl_on_new_line();
     rl_replace_line("", 0);

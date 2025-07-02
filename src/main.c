@@ -15,6 +15,22 @@
 
 #include "minishell.h" 
 
+// Funzione per pulire completamente readline
+void cleanup_readline_and_exit(void)
+{
+	// Pulisce la storia di readline
+	rl_clear_history();
+	
+	// Cleanup delle funzioni e keymaps
+	rl_cleanup_after_signal();
+	
+	// Reset completo di readline - questo dovrebbe liberare la maggior parte della memoria
+	rl_reset_terminal(NULL);
+	
+	// Pulisce il prompt
+	rl_set_prompt("");
+}
+
 int main(void)
 {
 	char *line;
@@ -49,6 +65,9 @@ int main(void)
 		/* e) Cleanup memorie e risorse (tua parte) */
 		cleanup_after_execution(commands);
 		}
+
+	/* f) Cleanup completo di readline prima di uscire */
+	cleanup_readline_and_exit();
 
 	return g_state.last_status;
 }

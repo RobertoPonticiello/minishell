@@ -81,8 +81,9 @@ static t_command *init_command(t_token *curr, int *argc, char **argv)
     }
     argv[*argc] = NULL;
     cmd->argv = malloc((*argc + 1) * sizeof(char*));
-    for (int i = 0; i <= *argc; i++)
-        cmd->argv[i] = argv[i];
+    for (int i = 0; i < *argc; i++)
+        cmd->argv[i] = argv[i];  // Trasferisce ownership, non copia
+    cmd->argv[*argc] = NULL;
     
     // Se non ci sono argomenti e non ci sono errori di redirezione, libera e restituisci NULL
     if (*argc == 0 && !cmd->redir_error) {
